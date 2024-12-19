@@ -1,0 +1,50 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/1/Mux8Way16.hdl
+/**
+ * 8-way 16-bit multiplexor:
+ * out = a if sel = 000
+ *       b if sel = 001
+ *       c if sel = 010
+ *       d if sel = 011
+ *       e if sel = 100
+ *       f if sel = 101
+ *       g if sel = 110
+ *       h if sel = 111
+ */
+CHIP Mux8Way16 {
+    IN a[16], b[16], c[16], d[16],
+       e[16], f[16], g[16], h[16],
+       sel[3];
+    OUT out[16];
+
+    PARTS:
+    //// Replace this comment with your code.
+    Not(in= sel[0] , out=notsel0 );
+    Not(in= sel[1] , out=notsel1 );
+    Not(in= sel[2] , out=notsel2 );
+
+    And(a= notsel0, b= notsel1, out= not0not1);
+    And(a= sel[0], b= notsel1, out= is0not1);
+    And(a= notsel0, b= sel[1], out= not0is1);
+    And(a= sel[0], b= sel[1], out= is0is1);
+
+    And(a= not0not1, b= notsel2, out= sela);
+    And(a= is0not1, b= notsel2, out= selb);
+    And(a= not0is1, b= notsel2, out= selc);
+    And(a= is0is1, b= notsel2, out= seld);
+    And(a= not0not1, b= sel[2], out= sele);
+    And(a= is0not1, b= sel[2], out= self);
+    And(a= not0is1, b= sel[2], out= selg);
+    And(a= is0is1, b= sel[2], out= selh);
+
+    Mux16(a= true, b= a, sel= sela, out= outa);
+    Mux16(a= outa, b= b, sel= selb, out= outab);
+    Mux16(a= outab, b= c, sel= selc, out= outabc);
+    Mux16(a= outabc, b= d, sel= seld, out= outabcd);
+    Mux16(a= outabcd, b= e, sel= sele, out= outabcde);
+    Mux16(a= outabcde, b= f, sel= self, out= outabcdef);
+    Mux16(a= outabcdef, b= g, sel= selg, out= outabcdefg);
+    Mux16(a= outabcdefg, b= h, sel= selh, out= out);
+}
