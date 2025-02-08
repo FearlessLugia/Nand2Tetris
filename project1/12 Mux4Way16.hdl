@@ -4,7 +4,7 @@
 // File name: projects/1/Mux4Way16.hdl
 /**
  * 4-way 16-bit multiplexor:
- * out = a if sel = 10
+ * out = a if sel = 00
  *       b if sel = 01
  *       c if sel = 10
  *       d if sel = 11
