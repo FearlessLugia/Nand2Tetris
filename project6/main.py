@@ -4,32 +4,35 @@ from enum import Enum
 # prog.asm -> prog.hack
 class HackAssembler:
     def __init__(self):
-        self.parser = Parser()
+        self.parser = None
         self.code = Code()
         self.symbol_table = SymbolTable()
-        self.lines = []
         self.res = []
 
     # Opens the input file (prog.asm) and gets ready to process it
     # Constructs a symbol table, and adds to it all the predefined symbols
     def initialize(self):
-        with open('Max.asm', 'r', encoding="utf-8") as file:
-            lines = file.readlines()
-        for line in lines:
+        with open('MaxL.asm', 'r', encoding="utf-8") as file:
+            lines_temp = file.readlines()
+
+        lines = []
+        for line in lines_temp:
             if not line.strip().startswith('//') and line.strip():
-                self.lines.append(line.strip())
-        print(self.lines)
+                lines.append(line.strip())
+        print(lines)
+
+        self.parser = Parser(lines)
 
     # Reads the program lines, one by one, focusing only on (label) declarations.
     # Adds the found labels to the symbol table
     def first_pass(self):
-        for line in self.lines:
-            self.parser.current_line = line
+        while self.parser.has_more_lines():
+            self.parser.advance()
             # print(line, self.parser.instruction_type(), self.parser.symbol())
             if self.parser.instruction_type() != InstructionType.C_INSTRUCTION:
                 symbol = self.parser.symbol()
-                if not symbol.isdigit():
-                    self.symbol_table.add_entry(symbol, address=)
+                # if not symbol.isdigit():
+                # self.symbol_table.add_entry(symbol, address=)
 
     # While there are more lines to process:
     #   Gets the next instruction, and parses it
@@ -41,9 +44,10 @@ class HackAssembler:
     #   Assembles the binary values into a string of sixteen 0’s and 1’s
     #   Writes the string to the output file.
     def second_pass(self):
-        for line in self.lines:
-            self.parser.current_line = line
-            self.code.current_string = line
+        self.parser.line_num = -1
+        while self.parser.has_more_lines():
+            self.parser.advance()
+            self.code.current_string = self.parser.current_line
 
             if self.parser.instruction_type() == InstructionType.C_INSTRUCTION:
                 dest = self.parser.dest()
@@ -60,9 +64,10 @@ class HackAssembler:
                     res = str(bin(int(symbol))[2:]).rjust(16, '0')
                     print('res', res)
                     self.res.append(res)
-        print(self.res)
 
-        with open('Max.hack', 'w', encoding="utf-8") as file:
+            print(self.res)
+
+        with open('MaxL.hack', 'w', encoding="utf-8") as file:
             for line in self.res:
                 file.write(line + '\n')
 
@@ -75,16 +80,21 @@ class InstructionType(Enum):
 
 
 class Parser:
-    def __init__(self):
+    def __init__(self, lines):
         # self.current_line = 'D=D+1;JLE'
         # self.current_line = 'M=-1'
         self.current_line = ''
+        self.line_num = -1
+        self.lines = lines
+        self.lines_num = len(lines)
 
     def has_more_lines(self):
-        pass
+        print('has_more_lines', self.line_num, '<', self.lines_num - 1, self.line_num < self.lines_num - 1)
+        return self.line_num < self.lines_num - 1
 
     def advance(self):
-        pass
+        self.line_num += 1
+        self.current_line = self.lines[self.line_num]
 
     def instruction_type(self):
         if self.current_line.startswith('@'):
@@ -157,18 +167,6 @@ class SymbolTable:
 
 
 if __name__ == '__main__':
-    # parser = Parser()
-    # print(parser.symbol())
-    # print(parser.dest())
-    # print(parser.comp())
-    # print(parser.jump())
-
-    # code = Code()
-    # print(code.dest('DM'))
-    # print(code.comp('A+1'))
-    # print(code.comp('D&M'))
-    # print(code.jump('JNE'))
-
     assembler = HackAssembler()
     assembler.initialize()
     assembler.first_pass()
