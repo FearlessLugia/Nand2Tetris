@@ -3,16 +3,12 @@ from enum import Enum
 
 # prog.asm -> prog.hack
 class HackAssembler:
-    def __init__(self, files):
+    def __init__(self, file):
         self.symbol_table = None
         self.parser = None
         self.code = Code()
-
         self.res = []
-
-        self.files = files
-        self.file_num = -1
-        self.current_file = self.files[0]
+        self.current_file = file
 
     # Opens the input file (prog.asm) and gets ready to process it
     # Constructs a symbol table, and adds to it all the predefined symbols
@@ -85,6 +81,9 @@ class HackAssembler:
                     else:
                         self.symbol_table.current_num += 1
                         self.symbol_table.add_entry(symbol, self.symbol_table.current_num)
+                        res = str(bin(self.symbol_table.current_num)[2:]).rjust(16, '0')
+                        print('  res', res)
+                        self.res.append(res)
 
             # print(self.res)
         print('    symbol_table', self.symbol_table.symbol_table)
@@ -92,13 +91,6 @@ class HackAssembler:
         with open(self.current_file + '.hack', 'w', encoding="utf-8") as file:
             for line in self.res:
                 file.write(line + '\n')
-
-    def advance(self):
-        self.file_num += 1
-        if self.file_num < len(self.files):
-            self.current_file = self.files[self.file_num]
-        else:
-            self.current_file = None
 
 
 class InstructionType(Enum):
@@ -200,11 +192,8 @@ class SymbolTable:
 if __name__ == '__main__':
     files = ['Add', 'MaxL', 'Max', 'RectL', 'Rect', 'PongL', 'Pong']
 
-    assembler = HackAssembler(files)
+    assembler = HackAssembler(files[6])
 
-    while assembler.current_file:
-        assembler.initialize()
-        assembler.first_pass()
-        assembler.second_pass()
-
-        assembler.advance()
+    assembler.initialize()
+    assembler.first_pass()
+    assembler.second_pass()
