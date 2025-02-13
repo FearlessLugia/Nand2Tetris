@@ -20,7 +20,7 @@ class HackAssembler:
         for line in lines_temp:
             if not line.strip().startswith('//') and line.strip():
                 lines.append(line.strip())
-        print(lines, len(lines))
+        # print(lines, len(lines))
 
         self.parser = Parser(lines)
         self.symbol_table = SymbolTable()
@@ -33,15 +33,13 @@ class HackAssembler:
         while self.parser.has_more_lines():
             self.parser.advance()
 
-            # print(line, self.parser.instruction_type(), self.parser.symbol())
             if self.parser.instruction_type() == InstructionType.L_INSTRUCTION:
                 symbol = self.parser.symbol()
-                # print('s,num', symbol, self.parser.line_num)
                 if not symbol.isdigit():
                     self.symbol_table.add_entry(symbol, self.parser.line_num - line_num_to_reduce)
                     line_num_to_reduce += 1
 
-        print('    symbol_table', self.symbol_table.symbol_table)
+        # print('    symbol_table', self.symbol_table.symbol_table)
 
     # While there are more lines to process:
     #   Gets the next instruction, and parses it
@@ -63,12 +61,12 @@ class HackAssembler:
                 comp = self.parser.comp()
                 jump = self.parser.jump()
                 res = '111' + self.code.comp(comp) + self.code.dest(dest) + self.code.jump(jump)
-                print('  res', self.parser.current_line, res)
+                # print('  res', self.parser.current_line, res)
                 self.res.append(res)
 
             elif self.parser.instruction_type() == InstructionType.A_INSTRUCTION:
                 symbol = self.parser.symbol()
-                print('symbol', symbol)
+                # print('symbol', symbol)
                 if symbol.isdigit():
                     res = str(bin(int(symbol))[2:]).rjust(16, '0')
                     self.res.append(res)
@@ -76,17 +74,16 @@ class HackAssembler:
                     if self.symbol_table.contains(symbol):
                         address = self.symbol_table.get_address(symbol)
                         res = str(bin(address)[2:]).rjust(16, '0')
-                        print('  res', res)
+                        # print('  res', res)
                         self.res.append(res)
                     else:
                         self.symbol_table.current_num += 1
                         self.symbol_table.add_entry(symbol, self.symbol_table.current_num)
                         res = str(bin(self.symbol_table.current_num)[2:]).rjust(16, '0')
-                        print('  res', res)
+                        # print('  res', res)
                         self.res.append(res)
 
-            # print(self.res)
-        print('    symbol_table', self.symbol_table.symbol_table)
+        # print('    symbol_table', self.symbol_table.symbol_table)
 
         with open(self.current_file + '.hack', 'w', encoding="utf-8") as file:
             for line in self.res:
@@ -102,15 +99,12 @@ class InstructionType(Enum):
 
 class Parser:
     def __init__(self, lines):
-        # self.current_line = 'D=D+1;JLE'
-        # self.current_line = 'M=-1'
         self.current_line = ''
         self.line_num = -1
         self.lines = lines
         self.lines_num = len(lines)
 
     def has_more_lines(self):
-        # print('has_more_lines', self.line_num, '<', self.lines_num - 1, self.line_num < self.lines_num - 1)
         return self.line_num < self.lines_num - 1
 
     def advance(self):
@@ -137,7 +131,6 @@ class Parser:
         return self.current_line.split('=')[0]
 
     def comp(self):
-        # print('self.current_line.split()', self.current_line.split('='))
         split = self.current_line.split('=')
         if len(split) > 1:
             return split[1].split(';')[0]
