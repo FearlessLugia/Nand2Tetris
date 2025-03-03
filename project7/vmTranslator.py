@@ -77,8 +77,10 @@ class CodeWriter:
     # Opens an output file / stream and gets ready to write into it
     def __init__(self, parser, current_file):
         res = []
+        self.file = current_file
         self.parser = parser
-        self.count = 0
+        self.jump_count = -1
+        self.static_count = 15
 
         parser.line_num = -1
         while parser.has_more_lines():
@@ -100,34 +102,36 @@ class CodeWriter:
     def write_arithmetic(self):
         arg = self.parser.arg1()
 
-        map = {'add': 'D+M', 'sub': 'M-D', 'and': 'D&M', 'or': 'D|M'}
-        if arg in map:
+        arithmetic_map = {'add': 'D+M', 'sub': 'M-D', 'and': 'D&M', 'or': 'D|M'}
+        if arg in arithmetic_map:
             return [f'// {self.parser.current_line}',
                     '@SP', 'M=M-1', 'A=M', 'D=M',
                     '@SP', 'M=M-1', 'A=M',
-                    f'M={map[arg]}',
+                    f'M={arithmetic_map[arg]}',
                     '@SP', 'M=M+1']
 
-        map = {'neg': '-', 'not': '!'}
-        if arg in map:
+        arithmetic_map = {'neg': '-', 'not': '!'}
+        if arg in arithmetic_map:
             return [f'// {self.parser.current_line}',
-                    '@SP', 'M=M-1', 'A=M',
-                    f'D={map[arg]}M',
-                    '@SP', 'M=M+1']
+                    '@SP', 'A=M-1',
+                    f'M={arithmetic_map[arg]}M']
 
-        map = {'eq': 'JEQ', 'gt': 'JGT', 'lt': 'JLT'}
-        if arg in map:
-            self.count += 1
+        arithmetic_map = {'eq': 'JEQ', 'gt': 'JGT', 'lt': 'JLT'}
+        if arg in arithmetic_map:
+            self.jump_count += 1
             return [f'// {self.parser.current_line}',
                     '@SP', 'M=M-1', 'A=M', 'D=M',
-                    '@SP', 'M=M-1', 'A=M', 'M=D-M',
-                    f'@LABEL{self.count}', f'D;{map[arg]}',
-                    '@SP', 'M=M+1',
-                    f'(LABEL{self.count})']
+                    '@SP', 'M=M-1', 'A=M', 'D=M-D',
+                    f'@LABEL{self.jump_count}', f'D;{arithmetic_map[arg]}',
+                    '@SP', 'A=M', 'M=0',
+                    f'@LABEL{self.jump_count}END', '0;JMP',
+                    f'(LABEL{self.jump_count})',
+                    '@SP', 'A=M', 'M=-1',
+                    f'(LABEL{self.jump_count}END)',
+                    '@SP', 'M=M+1']
 
     # Writes to the output file the assembly code that implements the given push or pop command
     def write_push_pop(self):
-        res = []
         segment = self.parser.arg1()
         i = self.parser.arg2()
         self.ram_map = {'local': 'LCL', 'argument': 'ARG', 'this': 'THIS', 'that': 'THAT'}
@@ -157,7 +161,13 @@ class CodeWriter:
                     '@SP', 'M=M+1']  # '// SP++'
 
             elif segment == 'static':
-                pass
+                self.jump_count += 1
+                return [
+                    f'// {self.parser.current_line}',
+                    f'@{i}', 'D=A',  # '// D=i'
+                    f'@{self.file + self.static_count}', 'A=M', 'A=D+A', 'D=M',  # '// D=RAM[segment+i]'
+                    '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
+                    '@SP', 'M=M+1']  # '// SP++'
 
             elif segment == 'pointer':
                 pass
@@ -197,8 +207,8 @@ class CodeWriter:
 
 if __name__ == '__main__':
     # files = ['StackArithmetic/SimpleAdd/SimpleAdd']
-    # files = ['StackArithmetic/StackTest/StackTest']
-    files = ['MemoryAccess/BasicTest/BasicTest']
+    files = ['StackArithmetic/StackTest/StackTest']
+    # files = ['MemoryAccess/BasicTest/BasicTest']
     # files = ['MemoryAccess/PointerTest/PointerTest']
     # files = ['MemoryAccess/StaticTest/StaticTest']
 
