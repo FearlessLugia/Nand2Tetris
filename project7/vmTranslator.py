@@ -1,6 +1,5 @@
+import sys
 from enum import Enum
-
-from project6.main import InstructionType
 
 
 # fileName.vm -> fileName.asm
@@ -38,7 +37,7 @@ class Parser:
         for line in lines_temp:
             if not line.strip().startswith('//') and line.strip():
                 lines.append(line.strip())
-        print(lines, len(lines))
+        # print(lines, len(lines))
 
         self.lines = lines
         self.lines_num = len(lines)
@@ -92,7 +91,7 @@ class CodeWriter:
             else:
                 res.extend(self.write_push_pop())
 
-        print('res', res)
+        # print('res', res)
 
         with open(current_file + '.asm', 'w', encoding="utf-8") as file:
             for line in res:
@@ -142,25 +141,25 @@ class CodeWriter:
                     f'// {self.parser.current_line}',
                     f'@{i}', 'D=A',  # // D=i
                     '@SP', 'A=M', 'M=D',  # // RAM[SP]=D
-                    '@SP', 'M=M+1']  # '// SP++'
+                    '@SP', 'M=M+1']  # // SP++
 
             if segment in self.ram_map:
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # '// D=i'
+                    f'@{i}', 'D=A',  # // D=i
                     f'@{self.ram_map[segment]}', 'A=M', 'A=D+A', 'D=M',  # // D=RAM[segment+i]
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
-                    '@SP', 'M=M+1']  # '// SP++'
+                    '@SP', 'M=M+1']  # // SP++
 
             if segment == 'temp':
                 return [
                     f'// {self.parser.current_line}',
                     f'@{5 + int(i)}', 'D=A',  # // D=i
-                    '@5', 'A=M', 'A=D+A', 'D=M',  # '// D=RAM[segment+i]'
+                    '@5', 'A=M', 'A=D+A', 'D=M',  # // D=RAM[segment+i]
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
                     '@SP', 'M=M+1']  # // SP++
 
-            elif segment == 'static':
+            if segment == 'static':
                 self.jump_count += 1
                 return [
                     f'// {self.parser.current_line}',
@@ -169,48 +168,47 @@ class CodeWriter:
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
                     '@SP', 'M=M+1']  # // SP++
 
-            elif segment == 'pointer':
+            if segment == 'pointer':
                 this_that = 'THIS' if i == '0' else 'THAT'
                 return [
                     f'// {self.parser.current_line}',
                     f'@{this_that}', 'D=M',  # // D=i
                     '@SP', 'A=M', 'M=D',  # // RAM[SP]=D
-                    '@SP', 'M=M+1']  # '// SP++
+                    '@SP', 'M=M+1']  # // SP++
 
-
-        elif self.parser.command_type() == CommandType.C_POP:
+        if self.parser.command_type() == CommandType.C_POP:
             if segment in self.ram_map:
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # '// D=i'
-                    f'@{self.ram_map[segment]}', 'A=M', 'D=D+A',  # '// D=RAM[segment+i]'
+                    f'@{i}', 'D=A',  # // D=i
+                    f'@{self.ram_map[segment]}', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
                     '@R13', 'M=D',
-                    '@SP', 'M=M-1',  # '// SP--'
+                    '@SP', 'M=M-1',  # // SP--
                     'A=M', 'D=M',
                     '@R13', 'A=M', 'M=D']
 
             if segment == 'temp':
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{5 + int(i)}', 'D=A',  # '// D=i'
-                    '@5', 'A=M', 'D=D+A',  # '// D=RAM[segment+i]'
+                    f'@{5 + int(i)}', 'D=A',  # // D=i
+                    '@5', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
                     '@R13', 'M=D',
-                    '@SP', 'M=M-1',  # '// SP--'
+                    '@SP', 'M=M-1',  # // SP--
                     'A=M', 'D=M',
                     '@R13', 'A=M', 'M=D']
 
-            elif segment == 'static':
+            if segment == 'static':
                 self.jump_count += 1
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # '// D=i'
-                    f'@{self.file + str(self.static_count)}', 'A=M', 'D=D+A',  # '// D=RAM[segment+i]'
+                    f'@{i}', 'D=A',  # // D=i
+                    f'@{self.file + str(self.static_count)}', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
                     '@R13', 'M=D',
-                    '@SP', 'M=M-1',  # '// SP--'
+                    '@SP', 'M=M-1',  # // SP--
                     'A=M', 'D=M',
                     '@R13', 'A=M', 'M=D']
 
-            elif segment == 'pointer':
+            if segment == 'pointer':
                 this_that = 'THIS' if i == '0' else 'THAT'
                 return [
                     f'// {self.parser.current_line}',
@@ -218,17 +216,16 @@ class CodeWriter:
                     'A=M', 'D=M',  # D=RAM[SP]
                     f'@{this_that}', 'M=D']  # // THIS/THAT=RAM[SP]
 
-        # Closes the output file
-
-    def close(self):
-        pass
-
 
 if __name__ == '__main__':
-    # files = ['StackArithmetic/SimpleAdd/SimpleAdd']
-    # files = ['StackArithmetic/StackTest/StackTest']
-    # files = ['MemoryAccess/BasicTest/BasicTest']
-    # files = ['MemoryAccess/StaticTest/StaticTest']
-    files = ['MemoryAccess/PointerTest/PointerTest']
+    # files = ['StackArithmetic/SimpleAdd/SimpleAdd', 'StackArithmetic/StackTest/StackTest',
+    #          'MemoryAccess/BasicTest/BasicTest', 'MemoryAccess/StaticTest/StaticTest',
+    #          'MemoryAccess/PointerTest/PointerTest']
+    # vm_translator = VMTranslator(files[0])
 
-    vm_translator = VMTranslator(files[0])
+    args = sys.argv
+    if len(args) < 1:
+        print('Need file name with .vm')
+
+    file_name = args[1].split('.vm')[0]
+    vm_translator = VMTranslator(file_name)
