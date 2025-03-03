@@ -77,7 +77,7 @@ class CodeWriter:
     # Opens an output file / stream and gets ready to write into it
     def __init__(self, parser, current_file):
         res = []
-        self.file = current_file
+        self.file = current_file.split('/')[-1]
         self.parser = parser
         self.jump_count = -1
         self.static_count = 15
@@ -165,7 +165,7 @@ class CodeWriter:
                 return [
                     f'// {self.parser.current_line}',
                     f'@{i}', 'D=A',  # '// D=i'
-                    f'@{self.file + self.static_count}', 'A=M', 'A=D+A', 'D=M',  # '// D=RAM[segment+i]'
+                    f'@{self.file + str(self.static_count)}', 'A=M', 'A=D+A', 'D=M',  # '// D=RAM[segment+i]'
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
                     '@SP', 'M=M+1']  # '// SP++'
 
@@ -195,7 +195,15 @@ class CodeWriter:
                     '@R13', 'A=M', 'M=D']
 
             elif segment == 'static':
-                pass
+                self.jump_count += 1
+                return [
+                    f'// {self.parser.current_line}',
+                    f'@{i}', 'D=A',  # '// D=i'
+                    f'@{self.file + str(self.static_count)}', 'A=M', 'D=D+A',  # '// D=RAM[segment+i]'
+                    '@R13', 'M=D',
+                    '@SP', 'M=M-1',  # '// SP--'
+                    'A=M', 'D=M',
+                    '@R13', 'A=M', 'M=D']
 
             elif segment == 'pointer':
                 pass
@@ -207,9 +215,9 @@ class CodeWriter:
 
 if __name__ == '__main__':
     # files = ['StackArithmetic/SimpleAdd/SimpleAdd']
-    files = ['StackArithmetic/StackTest/StackTest']
+    # files = ['StackArithmetic/StackTest/StackTest']
     # files = ['MemoryAccess/BasicTest/BasicTest']
     # files = ['MemoryAccess/PointerTest/PointerTest']
-    # files = ['MemoryAccess/StaticTest/StaticTest']
+    files = ['MemoryAccess/StaticTest/StaticTest']
 
     vm_translator = VMTranslator(files[0])
