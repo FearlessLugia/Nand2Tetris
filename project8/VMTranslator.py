@@ -15,12 +15,12 @@ class CommandType(Enum):
     C_ARITHMETIC = 1
     C_PUSH = 2
     C_POP = 3
-    # C_LABEL = 4
-    # C_GOTO = 5
-    # C_IF = 6
-    # C_FUNCTION = 7
-    # C_RETURN = 8
-    # C_CALL = 9
+    C_LABEL = 4
+    C_GOTO = 5
+    C_IF = 6
+    C_FUNCTION = 7
+    C_RETURN = 8
+    C_CALL = 9
 
 
 # Parses each VM command into its lexical elements
@@ -56,17 +56,30 @@ class Parser:
             return CommandType.C_PUSH
         if self.current_line.startswith('pop '):
             return CommandType.C_POP
+        if self.current_line.startswith('label '):
+            return CommandType.C_LABEL
+        if self.current_line.startswith('goto '):
+            return CommandType.C_GOTO
+        if self.current_line.startswith('if-goto '):
+            return CommandType.C_IF
+        if self.current_line.startswith('call '):
+            return CommandType.C_CALL
+        if self.current_line.startswith('function '):
+            return CommandType.C_FUNCTION
+        if self.current_line.startswith('return '):
+            return CommandType.C_RETURN
         return CommandType.C_ARITHMETIC
 
     # Returns the first argument of the current command
     # In the case of C_ARITHMETIC, the command itself (add, sub, etc.) is returned
+    # Should not be called if the current command is C_RETURN
     def arg1(self):
         if self.command_type() == CommandType.C_ARITHMETIC:
             return self.current_line
         return self.current_line.split()[1]
 
     # Returns the second argument of the current command
-    # Should be called only if the current command is C_PUSH, C_POP
+    # Should be called only if the current command is C_PUSH, C_POP, C_FUNCTION, or C_CALL
     def arg2(self):
         return self.current_line.split()[2]
 
@@ -88,8 +101,20 @@ class CodeWriter:
 
             if self.parser.command_type() == CommandType.C_ARITHMETIC:
                 res.extend(self.write_arithmetic())
-            else:
+            elif self.parser.command_type() == CommandType.C_PUSH or self.parser.command_type() == CommandType.C_POP:
                 res.extend(self.write_push_pop())
+            elif self.parser.command_type() == CommandType.C_LABEL:
+                res.extend(self.write_label())
+            elif self.parser.command_type() == CommandType.C_GOTO:
+                res.extend(self.write_goto())
+            elif self.parser.command_type() == CommandType.C_IF:
+                res.extend(self.write_if())
+            elif self.parser.command_type() == CommandType.C_FUNCTION:
+                res.extend(self.write_function())
+            elif self.parser.command_type() == CommandType.C_RETURN:
+                res.extend(self.write_return())
+            elif self.parser.command_type() == CommandType.C_CALL:
+                res.extend(self.write_call())
 
         # print('res', res)
 
@@ -216,16 +241,56 @@ class CodeWriter:
                     'A=M', 'D=M',  # D=RAM[SP]
                     f'@{this_that}', 'M=D']  # // THIS/THAT=RAM[SP]
 
+    # Informs that the translation of a new VM file has started (called by the VMTranslator)
+    def set_file_name(self):
+        pass
+
+    def write_init(self):
+        pass
+
+    # Writes assembly code that effects the label command
+    def write_label(self):
+        arg = self.parser.arg1()
+        return [f'// {self.parser.current_line}',
+                f'({arg})']
+
+    # Writes assembly code that effects the goto command
+    def write_goto(self):
+        arg = self.parser.arg1()
+        return [f'// {self.parser.current_line}',
+                f'@{arg}',
+                '0;JMP']
+
+    # Writes assembly code that effects the if-goto command
+    def write_if(self):
+        arg = self.parser.arg1()
+        return [f'// {self.parser.current_line}',
+                '@SP', 'M=M-1', 'A=M', 'D=M',
+                f'@{arg}',
+                'D;JNE']
+
+    # Writes assembly code that effects the function command
+    def write_function(self):
+        pass
+
+    # Writes assembly code that effects the call command
+    def write_call(self):
+        pass
+
+    # Writes assembly code that effects the return command
+    def write_return(self):
+        pass
+
 
 if __name__ == '__main__':
-    # files = ['StackArithmetic/SimpleAdd/SimpleAdd', 'StackArithmetic/StackTest/StackTest',
-    #          'MemoryAccess/BasicTest/BasicTest', 'MemoryAccess/StaticTest/StaticTest',
-    #          'MemoryAccess/PointerTest/PointerTest']
-    # vm_translator = VMTranslator(files[0])
+    files = ['ProgramFlow/BasicLoop/BasicLoop', 'ProgramFlow/FibonacciSeries/FibonacciSeries',
+             'FunctionCalls/SimpleFunction/SimpleFunction', 'FunctionCalls/NestedCall/NestedCall',
+             'FunctionCalls/FibonacciElement/FibonacciElement', 'FunctionCalls/StaticsTest/StaticsTest']
+    vm_translator = VMTranslator(files[0])
 
-    args = sys.argv
-    if len(args) < 1:
-        print('Need file name with .vm')
-
-    file_name = args[1].split('.vm')[0]
-    vm_translator = VMTranslator(file_name)
+    # args = sys.argv
+    # if len(args) < 1:
+    #     print('Need file name with .vm')
+    #
+    # file_name = args[1].split('.vm')[0]
+    # vm_translator = VMTranslator(file_name)
