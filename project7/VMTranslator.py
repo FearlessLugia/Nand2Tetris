@@ -62,7 +62,7 @@ class Parser:
     # In the case of C_ARITHMETIC, the command itself (add, sub, etc.) is returned
     def arg1(self):
         if self.command_type() == CommandType.C_ARITHMETIC:
-            return self.current_line
+            return self.current_line.split()[0]
         return self.current_line.split()[1]
 
     # Returns the second argument of the current command
