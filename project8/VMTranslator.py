@@ -75,7 +75,7 @@ class Parser:
     # Should not be called if the current command is C_RETURN
     def arg1(self):
         if self.command_type() == CommandType.C_ARITHMETIC:
-            return self.current_line
+            return self.current_line.split()[0]
         return self.current_line.split()[1]
 
     # Returns the second argument of the current command
@@ -286,7 +286,7 @@ if __name__ == '__main__':
     files = ['ProgramFlow/BasicLoop/BasicLoop', 'ProgramFlow/FibonacciSeries/FibonacciSeries',
              'FunctionCalls/SimpleFunction/SimpleFunction', 'FunctionCalls/NestedCall/NestedCall',
              'FunctionCalls/FibonacciElement/FibonacciElement', 'FunctionCalls/StaticsTest/StaticsTest']
-    vm_translator = VMTranslator(files[0])
+    vm_translator = VMTranslator(files[1])
 
     # args = sys.argv
     # if len(args) < 1:
