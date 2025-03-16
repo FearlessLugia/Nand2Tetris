@@ -66,7 +66,7 @@ class Parser:
             return CommandType.C_CALL
         if self.current_line.startswith('function '):
             return CommandType.C_FUNCTION
-        if self.current_line.startswith('return '):
+        if self.current_line.startswith('return'):
             return CommandType.C_RETURN
         return CommandType.C_ARITHMETIC
 
@@ -271,22 +271,78 @@ class CodeWriter:
 
     # Writes assembly code that effects the function command
     def write_function(self):
-        pass
+        function_name = self.parser.arg1()
+        n_vars = int(self.parser.arg2())
+
+        res = [f'// {self.parser.current_line}',
+               f'({function_name})']  # (Foo.bar)
+
+        for i in range(n_vars):  # nVars = number of local variables
+            res.extend(['@0', 'D=A', '@LCL', 'A=M', 'A=D+A', 'D=M', '@SP', 'A=M', 'M=D', '@SP',
+                        'M=M+1'])  # initializes the local variables to 0
+        for i in range(n_vars):
+            res.extend(['@SP', 'M=M-1'])
+
+        return res
 
     # Writes assembly code that effects the call command
     def write_call(self):
-        pass
+        arg1 = self.parser.arg1()
+        arg2 = self.parser.arg2()
+
+        return [f'// {self.parser.current_line}',
+                '',  # push returnAddress
+                '',  # push LCL
+                '',  # push ARG
+                '',  # push THIS
+                '',  # push THAT
+                '',  # ARG = SP-5-nArgs
+                '',  # LCL = SP
+                '',  # goto functionName
+                '']  # (returnAddress)
 
     # Writes assembly code that effects the return command
     def write_return(self):
-        pass
+        return [f'// {self.parser.current_line}',
+
+                # endFrame = LCL
+                '@LCL', 'D=M',
+                '@R13', 'M=D',
+
+                # retAddr = *(endFrame - 5)
+                '@5', 'A=D-A', 'D=M',
+                '@R14', 'M=D',
+
+                # *ARG = pop()
+                '@SP', 'AM=M-1', 'D=M',
+                '@ARG', 'A=M', 'M=D',
+
+                # SP = ARG + 1
+                '@ARG', 'D=M+1',
+                '@SP', 'M=D',
+
+                # THAT = *(endFrame - 1)
+                '@R13', 'AM=M-1', 'D=M',
+                '@THAT', 'M=D',
+                # THIS = *(endFrame - 2)
+                '@R13', 'AM=M-1', 'D=M',
+                '@THIS', 'M=D',
+                # ARG = *(endFrame - 3)
+                '@R13', 'AM=M-1', 'D=M',
+                '@ARG', 'M=D',
+                # LCL = *(endFrame - 4)
+                '@R13', 'AM=M-1', 'D=M',
+                '@LCL', 'M=D',
+
+                # goto retAddr
+                '@R14', 'A=M', '0;JMP']
 
 
 if __name__ == '__main__':
     files = ['ProgramFlow/BasicLoop/BasicLoop', 'ProgramFlow/FibonacciSeries/FibonacciSeries',
              'FunctionCalls/SimpleFunction/SimpleFunction', 'FunctionCalls/NestedCall/NestedCall',
              'FunctionCalls/FibonacciElement/FibonacciElement', 'FunctionCalls/StaticsTest/StaticsTest']
-    vm_translator = VMTranslator(files[1])
+    vm_translator = VMTranslator(files[2])
 
     # args = sys.argv
     # if len(args) < 1:
