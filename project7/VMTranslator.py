@@ -79,7 +79,6 @@ class CodeWriter:
         self.file = current_file.split('/')[-1]
         self.parser = parser
         self.jump_count = -1
-        self.static_count = 15
 
         parser.line_num = -1
         while parser.has_more_lines():
@@ -159,12 +158,10 @@ class CodeWriter:
                     '@SP', 'M=M+1']  # // SP++
 
             if segment == 'static':
-                self.jump_count += 1
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # // D=i
-                    f'@{self.file + str(self.static_count)}', 'A=M', 'A=D+A', 'D=M',  # // D=RAM[segment+i]
-                    '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
+                    f'@{self.file}.{i}', 'D=M',
+                    '@SP', 'A=M', 'M=D',
                     '@SP', 'M=M+1']  # // SP++
 
             if segment == 'pointer':
@@ -196,15 +193,10 @@ class CodeWriter:
                     '@R13', 'A=M', 'M=D']
 
             if segment == 'static':
-                self.jump_count += 1
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # // D=i
-                    f'@{self.file + str(self.static_count)}', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
-                    '@R13', 'M=D',
-                    '@SP', 'M=M-1',  # // SP--
-                    'A=M', 'D=M',
-                    '@R13', 'A=M', 'M=D']
+                    '@SP', 'AM=M-1', 'D=M',
+                    f'@{self.file}.{i}', 'M=D']
 
             if segment == 'pointer':
                 this_that = 'THIS' if i == '0' else 'THAT'
