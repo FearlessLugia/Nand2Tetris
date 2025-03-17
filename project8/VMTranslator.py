@@ -1,3 +1,4 @@
+import os
 import sys
 from enum import Enum
 
@@ -5,9 +6,8 @@ from enum import Enum
 # fileName.vm -> fileName.asm
 # Drives the process
 class VMTranslator:
-    def __init__(self, file):
-        self.parser = Parser(file)
-        self.code_writer = CodeWriter(self.parser, file)
+    def __init__(self, path):
+        self.code_writer = CodeWriter(path)
 
 
 class CommandType(Enum):
@@ -26,21 +26,33 @@ class CommandType(Enum):
 # Parses each VM command into its lexical elements
 class Parser:
     # Opens the input file/stream, and gets ready to parse it
-    def __init__(self, current_file):
+    def __init__(self, path):
         self.current_line = ''
         self.line_num = -1
+        self.lines = []
 
-        with open(current_file + '.vm', 'r', encoding="utf-8") as file:
-            lines_temp = file.readlines()
+        if '.vm' in path:
+            with open(path, 'r', encoding="utf-8") as file:
+                lines_temp = file.readlines()
 
-        lines = []
-        for line in lines_temp:
-            if not line.strip().startswith('//') and line.strip():
-                lines.append(line.strip())
-        # print(lines, len(lines))
+            for line in lines_temp:
+                if not line.strip().startswith('//') and line.strip():
+                    self.lines.append(line.strip())
 
-        self.lines = lines
-        self.lines_num = len(lines)
+        else:
+            vm_files = [f for f in os.listdir(path) if f.endswith('.vm')]
+            print('vm_files', vm_files)
+
+            for file in vm_files:
+                with open(os.path.join(path, file), 'r', encoding="utf-8") as file:
+                    lines_temp = file.readlines()
+
+                for line in lines_temp:
+                    if not line.strip().startswith('//') and line.strip():
+                        self.lines.append(line.strip())
+        # print('lines', self.lines, len(self.lines))
+
+        self.lines_num = len(self.lines)
 
     def has_more_lines(self) -> bool:
         return self.line_num < self.lines_num - 1
@@ -87,14 +99,30 @@ class Parser:
 # Writes the assembly code that implements the parsed command
 class CodeWriter:
     # Opens an output file / stream and gets ready to write into it
-    def __init__(self, parser, current_file):
+    def __init__(self, path):
         res = []
-        self.file = current_file.split('/')[-1]
+        parser = Parser(path)
         self.parser = parser
+
         self.jump_count = -1
+        self.call_count = {}
         self.static_count = 15
 
         parser.line_num = -1
+
+        print('  input_path', path)
+        if '.vm' in path:
+            file_name = path.split('.')[-2] + '.asm'
+            self.file = path.split('/')[-2]
+        else:
+            file_name = os.path.join(path, path.split('/')[-1] + '.asm')
+            self.file = path.split('/')[-1]
+
+            res.extend(self.write_init())
+
+        print('  output_file_name', file_name)
+        print('  self.file', self.file)
+
         while parser.has_more_lines():
             parser.advance()
             self.current_string = parser.current_line
@@ -118,7 +146,7 @@ class CodeWriter:
 
         # print('res', res)
 
-        with open(current_file + '.asm', 'w', encoding="utf-8") as file:
+        with open(file_name, 'w', encoding="utf-8") as file:
             for line in res:
                 file.write(line + '\n')
 
@@ -180,7 +208,6 @@ class CodeWriter:
                 return [
                     f'// {self.parser.current_line}',
                     f'@{5 + int(i)}', 'D=A',  # // D=i
-                    '@5', 'A=M', 'A=D+A', 'D=M',  # // D=RAM[segment+i]
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
                     '@SP', 'M=M+1']  # // SP++
 
@@ -216,7 +243,6 @@ class CodeWriter:
                 return [
                     f'// {self.parser.current_line}',
                     f'@{5 + int(i)}', 'D=A',  # // D=i
-                    '@5', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
                     '@R13', 'M=D',
                     '@SP', 'M=M-1',  # // SP--
                     'A=M', 'D=M',
@@ -246,7 +272,49 @@ class CodeWriter:
         pass
 
     def write_init(self):
-        pass
+        return [
+            # SP = 256
+            '@256', 'D=A',
+            '@SP', 'M=D',
+
+            # Call Sys.init
+            '// Call Sys.init',
+            # push returnAddrLabel
+            '@Sys.init$ret.0', 'D=A',
+            '@SP', 'A=M', 'M=D',
+            '@SP', 'M=M+1',
+
+            # push LCL
+            '@LCL', 'D=M',
+            '@SP', 'A=M', 'M=D',
+            '@SP', 'M=M+1',
+            # push ARG
+            '@ARG', 'D=M',
+            '@SP', 'A=M', 'M=D',
+            '@SP', 'M=M+1',
+            # push THIS
+            '@THIS', 'D=M',
+            '@SP', 'A=M', 'M=D',
+            '@SP', 'M=M+1',
+            # push THAT
+            '@THAT', 'D=M',
+            '@SP', 'A=M', 'M=D',
+            '@SP', 'M=M+1',
+
+            # ARG = SP - 5
+            '@SP', 'D=M',
+            '@5', 'D=D-A',
+            '@ARG', 'M=D',
+
+            # LCL = SP
+            '@SP', 'D=M',
+            '@LCL', 'M=D',
+
+            # goto Sys.init
+            '@Sys.init', '0;JMP',
+
+            # (returnAddrLabel)
+            '(Sys.init$ret.0)']
 
     # Writes assembly code that effects the label command
     def write_label(self):
@@ -275,31 +343,67 @@ class CodeWriter:
         n_vars = int(self.parser.arg2())
 
         res = [f'// {self.parser.current_line}',
+               # f'({self.file}.{function_name})']  # (Foo.bar)
                f'({function_name})']  # (Foo.bar)
 
         for i in range(n_vars):  # nVars = number of local variables
-            res.extend(['@0', 'D=A', '@LCL', 'A=M', 'A=D+A', 'D=M', '@SP', 'A=M', 'M=D', '@SP',
-                        'M=M+1'])  # initializes the local variables to 0
-        for i in range(n_vars):
-            res.extend(['@SP', 'M=M-1'])
+            res.extend(['@SP', 'A=M', 'M=0',
+                        '@SP', 'M=M+1'])  # initializes the local variables to 0
 
         return res
 
     # Writes assembly code that effects the call command
     def write_call(self):
-        arg1 = self.parser.arg1()
-        arg2 = self.parser.arg2()
+        # function_name = f'{self.file}.{self.parser.arg1()}'
+        function_name = f'{self.parser.arg1()}'
+        print('function_name', function_name)
+        n_vars = self.parser.arg2()
+
+        if function_name not in self.call_count:
+            self.call_count[function_name] = 0
+        self.call_count[function_name] += 1
+
+        function_name_ret = f'{function_name}$ret.{self.call_count[function_name]}'
 
         return [f'// {self.parser.current_line}',
-                '',  # push returnAddress
-                '',  # push LCL
-                '',  # push ARG
-                '',  # push THIS
-                '',  # push THAT
-                '',  # ARG = SP-5-nArgs
-                '',  # LCL = SP
-                '',  # goto functionName
-                '']  # (returnAddress)
+
+                # push returnAddrLabel
+                f'@{function_name_ret}', 'D=A',
+                '@SP', 'A=M', 'M=D',
+                '@SP', 'M=M+1',
+
+                # push LCL
+                '@LCL', 'D=M',
+                '@SP', 'A=M', 'M=D',
+                '@SP', 'M=M+1',
+                # push ARG
+                '@ARG', 'D=M',
+                '@SP', 'A=M', 'M=D',
+                '@SP', 'M=M+1',
+                # push THIS
+                '@THIS', 'D=M',
+                '@SP', 'A=M', 'M=D',
+                '@SP', 'M=M+1',
+                # push THAT
+                '@THAT', 'D=M',
+                '@SP', 'A=M', 'M=D',
+                '@SP', 'M=M+1',
+
+                # ARG = SP - 5 - nArgs
+                '@SP', 'D=M',
+                '@5', 'D=D-A',
+                f'@{n_vars}', 'D=D-A',
+                '@ARG', 'M=D',
+
+                # LCL = SP
+                '@SP', 'D=M',
+                '@LCL', 'M=D',
+
+                # goto functionName
+                f'@{function_name}', '0;JMP',
+
+                # (returnAddrLabel)
+                f'({function_name_ret})']
 
     # Writes assembly code that effects the return command
     def write_return(self):
@@ -339,14 +443,13 @@ class CodeWriter:
 
 
 if __name__ == '__main__':
-    files = ['ProgramFlow/BasicLoop/BasicLoop', 'ProgramFlow/FibonacciSeries/FibonacciSeries',
-             'FunctionCalls/SimpleFunction/SimpleFunction', 'FunctionCalls/NestedCall/NestedCall',
-             'FunctionCalls/FibonacciElement/FibonacciElement', 'FunctionCalls/StaticsTest/StaticsTest']
-    vm_translator = VMTranslator(files[2])
+    files = ['ProgramFlow/BasicLoop/BasicLoop.vm', 'ProgramFlow/FibonacciSeries/FibonacciSeries.vm',
+             'FunctionCalls/SimpleFunction/SimpleFunction.vm', 'FunctionCalls/NestedCall',
+             'FunctionCalls/FibonacciElement', 'FunctionCalls/StaticsTest']
+    vm_translator = VMTranslator(files[3])
 
     # args = sys.argv
     # if len(args) < 1:
-    #     print('Need file name with .vm')
+    #     print('Need file name')
     #
-    # file_name = args[1].split('.vm')[0]
-    # vm_translator = VMTranslator(file_name)
+    # vm_translator = VMTranslator(args[1])
