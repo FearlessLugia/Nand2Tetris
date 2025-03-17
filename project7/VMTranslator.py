@@ -155,7 +155,6 @@ class CodeWriter:
                 return [
                     f'// {self.parser.current_line}',
                     f'@{5 + int(i)}', 'D=A',  # // D=i
-                    '@5', 'A=M', 'A=D+A', 'D=M',  # // D=RAM[segment+i]
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
                     '@SP', 'M=M+1']  # // SP++
 
@@ -191,7 +190,6 @@ class CodeWriter:
                 return [
                     f'// {self.parser.current_line}',
                     f'@{5 + int(i)}', 'D=A',  # // D=i
-                    '@5', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
                     '@R13', 'M=D',
                     '@SP', 'M=M-1',  # // SP--
                     'A=M', 'D=M',
