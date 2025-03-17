@@ -2,8 +2,6 @@ import os
 import sys
 from enum import Enum
 
-from torch.cuda.tunable import set_filename
-
 
 # fileName.vm -> fileName.asm
 # Drives the process
@@ -96,18 +94,7 @@ class CodeWriter:
         self.jump_count = -1
         self.call_count = {}
 
-        print('  input_path', path)
-        # if '.vm' in path:
-        #     file_name = path.split('.')[-2] + '.asm'
-        #     self.file = path.split('/')[-2]
-        #
-        #     parser = Parser(path)
-        #     self.parser = parser
-        # else:
-        #     file_name = os.path.join(path, path.split('/')[-1] + '.asm')
-        #     self.file = path.split('/')[-1]
-        #
-        #     res.extend(self.write_init())
+        # print('  input_path', path)
 
         if os.path.isfile(path):
             file_name = path.split('.')[-2] + '.asm'
@@ -145,7 +132,7 @@ class CodeWriter:
             file_name = os.path.join(path, path.split('/')[-1] + '.asm')
 
             vm_files = [f for f in os.listdir(path) if f.endswith('.vm')]
-            print('vm_files', vm_files)
+            # print('vm_files', vm_files)
 
             res.extend(self.write_init())
 
@@ -179,31 +166,8 @@ class CodeWriter:
                     elif self.parser.command_type() == CommandType.C_CALL:
                         res.extend(self.write_call())
 
-        print('  output_file_name', file_name)
-        print('  self.file', self.file)
-
-        # parser.line_num = -1
-        #
-        # while parser.has_more_lines():
-        #     parser.advance()
-        #     self.current_string = parser.current_line
-        #
-        #     if self.parser.command_type() == CommandType.C_ARITHMETIC:
-        #         res.extend(self.write_arithmetic())
-        #     elif self.parser.command_type() == CommandType.C_PUSH or self.parser.command_type() == CommandType.C_POP:
-        #         res.extend(self.write_push_pop())
-        #     elif self.parser.command_type() == CommandType.C_LABEL:
-        #         res.extend(self.write_label())
-        #     elif self.parser.command_type() == CommandType.C_GOTO:
-        #         res.extend(self.write_goto())
-        #     elif self.parser.command_type() == CommandType.C_IF:
-        #         res.extend(self.write_if())
-        #     elif self.parser.command_type() == CommandType.C_FUNCTION:
-        #         res.extend(self.write_function())
-        #     elif self.parser.command_type() == CommandType.C_RETURN:
-        #         res.extend(self.write_return())
-        #     elif self.parser.command_type() == CommandType.C_CALL:
-        #         res.extend(self.write_call())
+        # print('  output_file_name', file_name)
+        # print('  self.file', self.file)
 
         # print('res', res)
 
@@ -275,8 +239,8 @@ class CodeWriter:
             if segment == 'static':
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{self.file}.{i}', 'D=M',  # // D=RAM[segment+i]
-                    '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
+                    f'@{self.file}.{i}', 'D=M',
+                    '@SP', 'A=M', 'M=D',
                     '@SP', 'M=M+1']  # // SP++
 
             if segment == 'pointer':
@@ -410,7 +374,7 @@ class CodeWriter:
     def write_call(self):
         # function_name = f'{self.file}.{self.parser.arg1()}'
         function_name = f'{self.parser.arg1()}'
-        print('call_function_name', function_name)
+        # print('call_function_name', function_name)
         n_vars = self.parser.arg2()
 
         if function_name not in self.call_count:
