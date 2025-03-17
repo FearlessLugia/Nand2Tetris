@@ -2,6 +2,8 @@ import os
 import sys
 from enum import Enum
 
+from torch.cuda.tunable import set_filename
+
 
 # fileName.vm -> fileName.asm
 # Drives the process
@@ -31,25 +33,13 @@ class Parser:
         self.line_num = -1
         self.lines = []
 
-        if '.vm' in path:
-            with open(path, 'r', encoding="utf-8") as file:
-                lines_temp = file.readlines()
+        with open(path, 'r', encoding="utf-8") as file:
+            lines_temp = file.readlines()
 
-            for line in lines_temp:
-                if not line.strip().startswith('//') and line.strip():
-                    self.lines.append(line.strip())
+        for line in lines_temp:
+            if not line.strip().startswith('//') and line.strip():
+                self.lines.append(line.strip())
 
-        else:
-            vm_files = [f for f in os.listdir(path) if f.endswith('.vm')]
-            print('vm_files', vm_files)
-
-            for file in vm_files:
-                with open(os.path.join(path, file), 'r', encoding="utf-8") as file:
-                    lines_temp = file.readlines()
-
-                for line in lines_temp:
-                    if not line.strip().startswith('//') and line.strip():
-                        self.lines.append(line.strip())
         # print('lines', self.lines, len(self.lines))
 
         self.lines_num = len(self.lines)
@@ -100,49 +90,120 @@ class Parser:
 class CodeWriter:
     # Opens an output file / stream and gets ready to write into it
     def __init__(self, path):
+        self.file = None
         res = []
-        parser = Parser(path)
-        self.parser = parser
 
         self.jump_count = -1
         self.call_count = {}
-        self.static_count = 15
-
-        parser.line_num = -1
 
         print('  input_path', path)
-        if '.vm' in path:
+        # if '.vm' in path:
+        #     file_name = path.split('.')[-2] + '.asm'
+        #     self.file = path.split('/')[-2]
+        #
+        #     parser = Parser(path)
+        #     self.parser = parser
+        # else:
+        #     file_name = os.path.join(path, path.split('/')[-1] + '.asm')
+        #     self.file = path.split('/')[-1]
+        #
+        #     res.extend(self.write_init())
+
+        if os.path.isfile(path):
             file_name = path.split('.')[-2] + '.asm'
-            self.file = path.split('/')[-2]
+
+            parser = Parser(path)
+            self.parser = parser
+            short_name = os.path.basename(path).replace('.vm', '')
+            self.set_file_name(short_name)
+
+            parser.line_num = -1
+
+            while parser.has_more_lines():
+                parser.advance()
+                self.current_string = parser.current_line
+
+                if self.parser.command_type() == CommandType.C_ARITHMETIC:
+                    res.extend(self.write_arithmetic())
+                elif self.parser.command_type() == CommandType.C_PUSH or self.parser.command_type() == CommandType.C_POP:
+                    res.extend(self.write_push_pop())
+                elif self.parser.command_type() == CommandType.C_LABEL:
+                    res.extend(self.write_label())
+                elif self.parser.command_type() == CommandType.C_GOTO:
+                    res.extend(self.write_goto())
+                elif self.parser.command_type() == CommandType.C_IF:
+                    res.extend(self.write_if())
+                elif self.parser.command_type() == CommandType.C_FUNCTION:
+                    res.extend(self.write_function())
+                elif self.parser.command_type() == CommandType.C_RETURN:
+                    res.extend(self.write_return())
+                elif self.parser.command_type() == CommandType.C_CALL:
+                    res.extend(self.write_call())
+
+
         else:
             file_name = os.path.join(path, path.split('/')[-1] + '.asm')
-            self.file = path.split('/')[-1]
+
+            vm_files = [f for f in os.listdir(path) if f.endswith('.vm')]
+            print('vm_files', vm_files)
 
             res.extend(self.write_init())
+
+            for file in vm_files:
+                full_path = os.path.join(path, file)
+                parser = Parser(full_path)
+                self.parser = parser
+                short_name = file.replace('.vm', '')
+                self.set_file_name(short_name)
+
+                parser.line_num = -1
+
+                while parser.has_more_lines():
+                    parser.advance()
+                    self.current_string = parser.current_line
+
+                    if self.parser.command_type() == CommandType.C_ARITHMETIC:
+                        res.extend(self.write_arithmetic())
+                    elif self.parser.command_type() == CommandType.C_PUSH or self.parser.command_type() == CommandType.C_POP:
+                        res.extend(self.write_push_pop())
+                    elif self.parser.command_type() == CommandType.C_LABEL:
+                        res.extend(self.write_label())
+                    elif self.parser.command_type() == CommandType.C_GOTO:
+                        res.extend(self.write_goto())
+                    elif self.parser.command_type() == CommandType.C_IF:
+                        res.extend(self.write_if())
+                    elif self.parser.command_type() == CommandType.C_FUNCTION:
+                        res.extend(self.write_function())
+                    elif self.parser.command_type() == CommandType.C_RETURN:
+                        res.extend(self.write_return())
+                    elif self.parser.command_type() == CommandType.C_CALL:
+                        res.extend(self.write_call())
 
         print('  output_file_name', file_name)
         print('  self.file', self.file)
 
-        while parser.has_more_lines():
-            parser.advance()
-            self.current_string = parser.current_line
-
-            if self.parser.command_type() == CommandType.C_ARITHMETIC:
-                res.extend(self.write_arithmetic())
-            elif self.parser.command_type() == CommandType.C_PUSH or self.parser.command_type() == CommandType.C_POP:
-                res.extend(self.write_push_pop())
-            elif self.parser.command_type() == CommandType.C_LABEL:
-                res.extend(self.write_label())
-            elif self.parser.command_type() == CommandType.C_GOTO:
-                res.extend(self.write_goto())
-            elif self.parser.command_type() == CommandType.C_IF:
-                res.extend(self.write_if())
-            elif self.parser.command_type() == CommandType.C_FUNCTION:
-                res.extend(self.write_function())
-            elif self.parser.command_type() == CommandType.C_RETURN:
-                res.extend(self.write_return())
-            elif self.parser.command_type() == CommandType.C_CALL:
-                res.extend(self.write_call())
+        # parser.line_num = -1
+        #
+        # while parser.has_more_lines():
+        #     parser.advance()
+        #     self.current_string = parser.current_line
+        #
+        #     if self.parser.command_type() == CommandType.C_ARITHMETIC:
+        #         res.extend(self.write_arithmetic())
+        #     elif self.parser.command_type() == CommandType.C_PUSH or self.parser.command_type() == CommandType.C_POP:
+        #         res.extend(self.write_push_pop())
+        #     elif self.parser.command_type() == CommandType.C_LABEL:
+        #         res.extend(self.write_label())
+        #     elif self.parser.command_type() == CommandType.C_GOTO:
+        #         res.extend(self.write_goto())
+        #     elif self.parser.command_type() == CommandType.C_IF:
+        #         res.extend(self.write_if())
+        #     elif self.parser.command_type() == CommandType.C_FUNCTION:
+        #         res.extend(self.write_function())
+        #     elif self.parser.command_type() == CommandType.C_RETURN:
+        #         res.extend(self.write_return())
+        #     elif self.parser.command_type() == CommandType.C_CALL:
+        #         res.extend(self.write_call())
 
         # print('res', res)
 
@@ -212,11 +273,9 @@ class CodeWriter:
                     '@SP', 'M=M+1']  # // SP++
 
             if segment == 'static':
-                self.jump_count += 1
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # // D=i
-                    f'@{self.file + str(self.static_count)}', 'A=M', 'A=D+A', 'D=M',  # // D=RAM[segment+i]
+                    f'@{self.file}.{i}', 'D=M',  # // D=RAM[segment+i]
                     '@SP', 'A=M', 'M=D',  # //RAM[SP] = RAM[addr]
                     '@SP', 'M=M+1']  # // SP++
 
@@ -249,15 +308,10 @@ class CodeWriter:
                     '@R13', 'A=M', 'M=D']
 
             if segment == 'static':
-                self.jump_count += 1
                 return [
                     f'// {self.parser.current_line}',
-                    f'@{i}', 'D=A',  # // D=i
-                    f'@{self.file + str(self.static_count)}', 'A=M', 'D=D+A',  # // D=RAM[segment+i]
-                    '@R13', 'M=D',
-                    '@SP', 'M=M-1',  # // SP--
-                    'A=M', 'D=M',
-                    '@R13', 'A=M', 'M=D']
+                    '@SP', 'AM=M-1', 'D=M',
+                    f'@{self.file}.{i}', 'M=D']
 
             if segment == 'pointer':
                 this_that = 'THIS' if i == '0' else 'THAT'
@@ -268,8 +322,8 @@ class CodeWriter:
                     f'@{this_that}', 'M=D']  # // THIS/THAT=RAM[SP]
 
     # Informs that the translation of a new VM file has started (called by the VMTranslator)
-    def set_file_name(self):
-        pass
+    def set_file_name(self, string):
+        self.file = string
 
     def write_init(self):
         return [
@@ -356,7 +410,7 @@ class CodeWriter:
     def write_call(self):
         # function_name = f'{self.file}.{self.parser.arg1()}'
         function_name = f'{self.parser.arg1()}'
-        print('function_name', function_name)
+        print('call_function_name', function_name)
         n_vars = self.parser.arg2()
 
         if function_name not in self.call_count:
@@ -443,13 +497,13 @@ class CodeWriter:
 
 
 if __name__ == '__main__':
-    files = ['ProgramFlow/BasicLoop/BasicLoop.vm', 'ProgramFlow/FibonacciSeries/FibonacciSeries.vm',
-             'FunctionCalls/SimpleFunction/SimpleFunction.vm', 'FunctionCalls/NestedCall',
-             'FunctionCalls/FibonacciElement', 'FunctionCalls/StaticsTest']
-    vm_translator = VMTranslator(files[3])
+    # files = ['ProgramFlow/BasicLoop/BasicLoop.vm', 'ProgramFlow/FibonacciSeries/FibonacciSeries.vm',
+    #          'FunctionCalls/SimpleFunction/SimpleFunction.vm', 'FunctionCalls/NestedCall',
+    #          'FunctionCalls/FibonacciElement', 'FunctionCalls/StaticsTest']
+    # vm_translator = VMTranslator(files[5])
 
-    # args = sys.argv
-    # if len(args) < 1:
-    #     print('Need file name')
-    #
-    # vm_translator = VMTranslator(args[1])
+    args = sys.argv
+    if len(args) < 1:
+        print('Need file name')
+
+    vm_translator = VMTranslator(args[1])
