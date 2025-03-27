@@ -14,11 +14,11 @@ class JackAnalyzer:
 
 class TokenType(Enum):
     NONE = 0
-    KEYWORD = 1
-    SYMBOL = 2
-    INTEGER_CONSTANT = 3
-    STRING_CONSTANT = 4
-    IDENTIFIER = 5
+    KEYWORD = 'keyword'
+    SYMBOL = 'symbol'
+    INTEGER_CONSTANT = 'integerConstant'
+    STRING_CONSTANT = 'stringConstant'
+    IDENTIFIER = 'identifier'
 
 
 class KeyWord(Enum):
@@ -50,20 +50,16 @@ class KeyWord(Enum):
 class JackTokenizer:
     # Opens the input .jack file/stream and gets ready to tokenize it
     def __init__(self, path):
-        self.dictionary = {'<': '&lt;', '>': '&gt;', '"': '&quot;', "&": "&amp;"}
-
-        self.current_line = ''
-        self.lines = []
-
         with open(path, 'r', encoding="utf-8") as file:
             lines_temp = file.readlines()
 
+        lines = []
         for line in lines_temp:
             if not line.strip().startswith('//') and line.strip():
-                self.lines.append(line.strip())
+                lines.append(line.strip())
 
         # print('lines', self.lines, len(self.lines))
-        self.full_text = '\n'.join(self.lines)
+        self.full_text = '\n'.join(lines)
         # print(self.full_text)
 
         token_spec = [
@@ -80,8 +76,8 @@ class JackTokenizer:
         self.r = re.compile(token_regex)
 
         self.tokens = list(self.r.finditer(self.full_text))
-        for i, tok in enumerate(self.tokens):
-            print(f"Token {i}: {tok.group()}  -> {tok.lastgroup}")
+        # for i, tok in enumerate(self.tokens):
+        #     print(f"Token {i}: {tok.group()}  -> {tok.lastgroup}")
 
         self.token_index = -1
         self.current_token = None
@@ -100,40 +96,35 @@ class JackTokenizer:
 
     # Returns the type of the current token, as a constant
     def token_type(self):
-        kind = self.current_token.lastgroup
-        if not kind:
-            return
-        token_type = TokenType[kind]
-        return token_type
+        return TokenType[self.current_token.lastgroup]
 
     # Returns the keyword which is the current token, as a constant
     # This method should be called only if tokenType is KEYWORD
     def key_word(self):
-        text = self.current_token.group()
-        print('  key_word', text)
-        return text
+        return self.current_token.group()
 
     # Returns the character which is the current token
     # Should be called only if tokenType is SYMBOL
     def symbol(self):
-        if self.key_word() == TokenType.KEYWORD:
-            return self.current_line.split()[0]
-        return self.current_line.split()[1]
+        dictionary = {'<': '&lt;', '>': '&gt;', '"': '&quot;', "&": "&amp;"}
+        if self.current_token.group() in dictionary:
+            return dictionary[self.current_token.group()]
+        return self.current_token.group()
 
     # Returns the string which is the current token
     # Should be called only if tokenType is IDENTIFIER
     def identifier(self):
-        return self.current_line.split()[2]
+        return self.current_token.group()
 
     # Returns the integer value of the current token
     # Should be called only if tokenType is INT_CONST
     def int_val(self):
-        pass
+        return int(self.current_token.group())
 
     # Returns the string value of the current token, without the opening and closing double quotes
     # Should be called only if tokenType is STRING_CONST
     def string_val(self):
-        pass
+        return self.current_token.group()[1:-1]
 
 
 # Handles the parsing
@@ -157,31 +148,31 @@ class CompilationEngine:
             short_name = os.path.basename(path).replace('.xml', '')
             self.set_file_name(short_name)
 
+            res.extend([f'<tokens>'])
             while parser.has_more_tokens():
                 parser.advance()
                 self.current_token = parser.current_token
 
                 token_type = self.parser.token_type()
+                print(f"Token {self.parser.token_index}: {self.current_token.group()} -> {token_type}")
 
+                if token_type == TokenType.KEYWORD:
+                    res.extend([f'<{token_type.value}> {self.parser.key_word()} </{token_type.value}>'])
+                    # res.extend(self.compile_class())
+                elif token_type == TokenType.SYMBOL:
+                    res.extend([f'<{token_type.value}> {self.parser.symbol()} </{token_type.value}>'])
+                    # res.extend(self.compile_class_var_dec())
+                elif token_type == TokenType.INTEGER_CONSTANT:
+                    res.extend([f'<{token_type.value}> {self.parser.int_val()} </{token_type.value}>'])
+                    # res.extend(self.compile_parameter_list())
+                elif token_type == TokenType.STRING_CONSTANT:
+                    res.extend([f'<{token_type.value}> {self.parser.string_val()} </{token_type.value}>'])
+                    # res.extend(self.compile_subroutine_body())
+                elif token_type == TokenType.IDENTIFIER:
+                    res.extend([f'<{token_type.value}> {self.parser.identifier()} </{token_type.value}>'])
+                    # res.extend(self.compile_var_dec())
 
-                # if token_type == TokenType.KEYWORD:
-                #     res.extend(self.compile_class())
-                # elif token_type == TokenType.C_PUSH or self.parser.key_word() == TokenType.C_POP:
-                #     res.extend(self.compile_class_var_dec())
-                # elif token_type == TokenType.C_LABEL:
-                #     res.extend(self.compile_parameter_list())
-                # elif self.parser.key_word() == TokenType.C_GOTO:
-                #     res.extend(self.compile_subroutine_body())
-                # elif self.parser.key_word() == TokenType.C_IF:
-                #     res.extend(self.compile_var_dec())
-                # elif self.parser.key_word() == TokenType.C_FUNCTION:
-                #     res.extend(self.compile_statements())
-                # elif self.parser.key_word() == TokenType.C_RETURN:
-                #     res.extend(self.compile_if())
-                # elif self.parser.key_word() == TokenType.C_CALL:
-                #     res.extend(self.compile_let())
-
-
+            res.extend([f'</tokens>'])
 
 
         else:
@@ -235,7 +226,6 @@ class CompilationEngine:
         else:
             print("syntax error")
         self.current_token = tokenizer.advance()
-
 
     # Compiles a complete class
     def compile_class(self):
@@ -552,11 +542,11 @@ class CompilationEngine:
     def compile_expression_list(self):
         pass
 
+
 if __name__ == '__main__':
     files = ['ArrayTest/Main0.jack', 'ExpressionLessSquare', 'Square']
     jack_analyzer = JackAnalyzer(files[0])
     parser = jack_analyzer.compilation_engine.parser
-    print('ct', parser.tokens)
 
     # args = sys.argv
     # if len(args) < 1:
