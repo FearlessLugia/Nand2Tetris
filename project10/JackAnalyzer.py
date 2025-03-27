@@ -51,16 +51,13 @@ class JackTokenizer:
     # Opens the input .jack file/stream and gets ready to tokenize it
     def __init__(self, path):
         with open(path, 'r', encoding="utf-8") as file:
-            lines_temp = file.readlines()
+            text = file.read()
 
-        lines = []
-        for line in lines_temp:
-            if not line.strip().startswith('//') and line.strip():
-                lines.append(line.strip())
+        text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+        text = re.sub(r'//.*', '', text)
 
-        # print('lines', self.lines, len(self.lines))
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
         self.full_text = '\n'.join(lines)
-        # print(self.full_text)
 
         token_spec = [
             (TokenType.KEYWORD, r'\b(class|constructor|function|method|field|static|var|int|char|boolean|void|'
@@ -72,7 +69,6 @@ class JackTokenizer:
         ]
 
         token_regex = '|'.join(f'(?P<{t.name}>{pattern})' for t, pattern in token_spec)
-        print('token_regex', token_regex)
         self.r = re.compile(token_regex)
 
         self.tokens = list(self.r.finditer(self.full_text))
@@ -154,7 +150,7 @@ class CompilationEngine:
                 self.current_token = parser.current_token
 
                 token_type = self.parser.token_type()
-                print(f"Token {self.parser.token_index}: {self.current_token.group()} -> {token_type}")
+                # print(f"Token {self.parser.token_index}: {self.current_token.group()} -> {token_type}")
 
                 if token_type == TokenType.KEYWORD:
                     res.extend([f'<{token_type.value}> {self.parser.key_word()} </{token_type.value}>'])
